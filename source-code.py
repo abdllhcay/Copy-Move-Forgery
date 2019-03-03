@@ -2,62 +2,50 @@ import numpy as np
 import cv2
 from pprint import pprint as pp
 from operator import itemgetter
+import sys
 
-#loading source image
-img=cv2.imread("img\Hats3.bmp",cv2.IMREAD_COLOR)
-cv2.imshow("Img",img)
-height, width=img.shape[:2]
+BLOCK_SIZE = 4
 
-#creating matrix A
-B=4
-A=[]
-indexInA=0
-for row in range(0,height-B+1):
-    for col in range(0,width-B+1):
-        roi=img[row:row+B,col:col+B]
-        rowInA=[list(j) for sub in roi for j in sub]
-        A.append([indexInA,rowInA])
-        indexInA+=1
+# Load image
+image = cv2.imread(str(sys.argv[1]), cv2.IMREAD_COLOR)
+cv2.imshow("Original Image", image)
+cv2.waitKey(1)
+height, width = image.shape[:2]
 
+# Create matrix block_pixels
+block_pixels = []
+index = 0
+for row in range(0, height - BLOCK_SIZE + 1):
+    for col in range(0, width - BLOCK_SIZE + 1):
+        roi = image[row : row + BLOCK_SIZE, col : col + BLOCK_SIZE]
+        block_row = [list(j) for sub in roi for j in sub]
+        block_pixels.append([index, block_row])
+        index += 1
 
+# Sort matrix
+sorted_block_pixels = sorted(block_pixels, key=itemgetter(1))
 
-sortedA=sorted(A, key=itemgetter(1))
-print("sorting done")
-print("press to start matching")
-input()
+# Find matching blocks
+matched_indexes = []
+for i in range(len(sorted_block_pixels)-1):
+    if(sorted_block_pixels[i][1] == sorted_block_pixels[i+1][1]):
+        matched_indexes.append([sorted_block_pixels[i][0], sorted_block_pixels[i+1][0]])
+        print(matched_indexes[-1])
 
-matchIndexes=[]
-for i in range(len(sortedA)-1):
-    if(sortedA[i][1]==sortedA[i+1][1]):
-        matchIndexes.append([sortedA[i][0],sortedA[i+1][0]])
-        print(matchIndexes[-1])
+# Mark forged parts of the image
+result = np.zeros((height, width, 3), np.uint8)
+forged = np.zeros((BLOCK_SIZE, BLOCK_SIZE, 3), np.uint8)
+forged[:,:] = (255,255,255)
 
+for i in matched_indexes:
+    h0 = int(i[0]/(width - BLOCK_SIZE + 1))
+    w0 = int(i[0]%(width - BLOCK_SIZE + 1))
+    result[h0 : h0 + BLOCK_SIZE, w0 : w0 + BLOCK_SIZE] = forged
+    h1 = int(i[1]/(width - BLOCK_SIZE + 1))
+    w1 = int(i[1]%(width - BLOCK_SIZE + 1))
+    result[h1 : h1 + BLOCK_SIZE, w1 : w1 + BLOCK_SIZE] = forged
 
-print("matching done")
-
-  
-    
-
-result=np.copy(img)
-redBlock=np.zeros((B,B,3),np.uint8)
-redBlock[:,:]=(0,0,255)
-blueBlock=np.zeros((B,B,3),np.uint8)
-blueBlock[:,:]=(255,0,0)
-
-
-for i in matchIndexes:
-    h0=int(i[0]/(width-B+1))
-    w0=int(i[0]%(width-B+1))
-    result[h0:h0+B,w0:w0+B]=redBlock
-    h1=int(i[1]/(width-B+1))
-    w1=int(i[1]%(width-B+1))
-    result[h1:h1+B,w1:w1+B]=blueBlock
-
-cv2.imshow("result",result)
-
-
-
+cv2.imshow("Forged Parts", result)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
-
